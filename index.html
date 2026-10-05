@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>WebAR ดอกทิวลิปและผีเสื้อบินรอบ (มุมมองด้านข้าง)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- A-Frame WebXR Framework -->
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <!-- AR.js for A-Frame Marker Tracking -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Sukhumvit Set', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .a-canvas {
+            z-index: 0 !important;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.82);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .pulse-glow {
+            box-shadow: 0 0 15px rgba(236, 72, 153, 0.6);
+        }
+        .btn-active {
+            background-color: #ec4899 !important;
+            color: #ffffff !important;
+            border-color: #f472b6 !important;
+            box-shadow: 0 0 12px rgba(236, 72, 153, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-black text-white">
+
+    <!-- แถบสถานะส่วนหัว -->
+    <div class="fixed top-0 left-0 right-0 z-50 p-4 pointer-events-none flex justify-between items-center">
+        <div class="glass-panel px-4 py-2.5 rounded-2xl flex items-center space-x-3 pointer-events-auto shadow-xl">
+            <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-pink-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-md">
+                <i class="fa-solid fa-seedling"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-xs sm:text-sm text-white">สวนทิวลิป & ผีเสื้อ AR (มุมด้านข้าง)</h1>
+                <p class="text-[11px] text-pink-300" id="markerStatus">กำลังสแกนหา Marker Hiro...</p>
+            </div>
+        </div>
+
+        <button id="toggleDebugBtn" class="glass-panel px-3 py-2 rounded-xl text-xs font-semibold hover:bg-slate-700/60 transition pointer-events-auto flex items-center gap-2 shadow-lg border border-pink-500/30">
+            <i class="fa-solid fa-cube text-pink-400"></i>
+            <span>โหมดตัวอย่าง 3D</span>
+        </button>
+    </div>
+
+    <!-- ข้อความคำแนะนำส่องกล้อง -->
+    <div id="hiroInstructions" class="fixed top-20 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none transition-all duration-300">
+        <div class="glass-panel px-4 py-2 rounded-full text-xs text-pink-200 border border-pink-500/30 flex items-center gap-2 shadow-lg">
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
+            </span>
+            <span>หัน Marker "Hiro" หรือหันกล้องด้านข้างเพื่อดูมุมมอง Side View</span>
+        </div>
+    </div>
+
+    <!-- แผงเมนูควบคุมระบบ AR ภาษาไทย -->
+    <div class="fixed bottom-5 left-0 right-0 z-50 px-4 pointer-events-none">
+        <div class="max-w-md mx-auto glass-panel p-4 rounded-3xl pointer-events-auto shadow-2xl border border-white/10 space-y-3.5">
+            
+            <!-- เลือกสีดอกทิวลิป -->
+            <div>
+                <div class="flex justify-between items-center mb-1.5">
+                    <label class="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-palette text-pink-400"></i> เปลี่ยนสีดอกทิวลิป
+                    </label>
+                    <span id="currentColorText" class="text-[10px] text-pink-300 font-medium">สีชมพูหวาน</span>
+                </div>
+                <div class="grid grid-cols-4 gap-2">
+                    <button data-color="#f472b6" data-name="สีชมพูหวาน" class="color-btn btn-active bg-slate-800/80 hover:bg-slate-700 border border-slate-700 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1">
+                        <span class="w-3 h-3 rounded-full bg-pink-400 inline-block"></span> ชมพู
+                    </button>
+                    <button data-color="#ef4444" data-name="สีแดงสด" class="color-btn bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1">
+                        <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span> แดง
+                    </button>
+                    <button data-color="#eab308" data-name="สีเหลืองทอง" class="color-btn bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1">
+                        <span class="w-3 h-3 rounded-full bg-yellow-400 inline-block"></span> เหลือง
+                    </button>
+                    <button data-color="#a855f7" data-name="สีม่วงเสน่ห์" class="color-btn bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1">
+                        <span class="w-3 h-3 rounded-full bg-purple-500 inline-block"></span> ม่วง
+                    </button>
+                </div>
+            </div>
+
+            <!-- ปรับความเร็วผีเสื้อ & จำนวนผีเสื้อ -->
+            <div class="grid grid-cols-2 gap-3 pt-1 border-t border-slate-700/60">
+                <!-- ความเร็วผีเสื้อ -->
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                        <i class="fa-solid fa-gauge-high text-cyan-400"></i> ความเร็วผีเสื้อ
+                    </label>
+                    <div class="flex gap-1">
+                        <button data-speed="0.5" class="speed-btn bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 py-1.5 flex-1 rounded-lg text-[11px] font-bold transition">ช้า</button>
+                        <button data-speed="1.0" class="speed-btn btn-active bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 py-1.5 flex-1 rounded-lg text-[11px] font-bold transition">ปกติ</button>
+                        <button data-speed="2.0" class="speed-btn bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 py-1.5 flex-1 rounded-lg text-[11px] font-bold transition">เร็ว</button>
+                    </div>
+                </div>
+
+                <!-- ปริมาณผีเสื้อ -->
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                        <i class="fa-solid fa-bugs text-purple-400"></i> จำนวนผีเสื้อ
+                    </label>
+                    <div class="flex items-center justify-between bg-slate-900/80 border border-slate-700 rounded-lg p-1">
+                        <button id="btnDecreaseBF" class="w-7 h-7 rounded-md bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center active:scale-95 transition">-</button>
+                        <span id="bfCountDisplay" class="font-mono text-xs font-bold text-pink-300">4 ตัว</span>
+                        <button id="btnIncreaseBF" class="w-7 h-7 rounded-md bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center active:scale-95 transition">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- สลับมุมมองปรับแต่ง (Side Angle Reset) -->
+            <div class="flex justify-between items-center pt-2 border-t border-slate-700/60 text-xs">
+                <span class="text-slate-400 text-[11px]"><i class="fa-solid fa-eye text-pink-400 mr-1"></i> ปรับแต่งสำหรับส่อง Marker จากด้านข้าง</span>
+                <button id="resetSideViewBtn" class="text-pink-400 hover:text-pink-300 font-semibold text-[11px] underline flex items-center gap-1">
+                    <i class="fa-solid fa-rotate-left"></i> รีเซ็ตมุมด้านข้าง
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ฉาก A-Frame AR -->
+    <a-scene 
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+        vr-mode-ui="enabled: false"
+        renderer="logarithmicDepthBuffer: true; colorManagement: true; antialias: true;"
+        id="arScene">
+
+        <!-- แสงสว่างสำหรับมุมมองด้านข้าง -->
+        <a-entity light="type: ambient; color: #ffffff; intensity: 0.85;"></a-entity>
+        <a-entity light="type: directional; color: #fff0f5; intensity: 1.2; castShadow: true" position="3 5 2"></a-entity>
+        <a-entity light="type: point; color: #f472b6; intensity: 0.9; distance: 6" position="0 2 1"></a-entity>
+
+        <!-- Hiro AR Marker -->
+        <a-marker preset="hiro" id="hiroMarker">
+            
+            <!--
+              กลุ่มวัตถุหลัก (Main World Entity):
+              ปรับ rotation="90 0 0" เพื่อตั้งองศาให้ดอกทิวลิปตั้งตรงสวยงามเมื่อมองส่องจากด้านข้างของ Marker Hiro!
+            -->
+            <a-entity id="mainGardenGroup" position="0 0 0" rotation="90 0 0" scale="0.9 0.9 0.9">
+
+                <!-- กระถางต้นไม้และดิน (Base Pot & Soil) -->
+                <a-entity id="potAndSoil" position="0 -0.4 0">
+                    <!-- ตัวกระถางเซรามิก -->
+                    <a-cone position="0 0.2 0" radius-top="0.45" radius-bottom="0.3" height="0.4" color="#334155" material="roughness: 0.3; metalness: 0.2"></a-cone>
+                    <a-torus position="0 0.4 0" radius="0.45" radius-tubular="0.03" rotation="90 0 0" color="#475569"></a-torus>
+                    <!-- ดินในกระถาง -->
+                    <a-cylinder position="0 0.38 0" radius="0.43" height="0.04" color="#3f2314" material="roughness: 0.9"></a-cylinder>
+                </a-entity>
+
+                <!-- ต้นทิวลิป 3D (Procedural Tulip Flower) -->
+                <a-entity id="tulipPlant" position="0 0 0">
+                    <!-- ก้านดอกทิวลิปโค้งมน -->
+                    <a-cylinder id="stem" position="0 0.35 0" radius="0.03" height="1.1" color="#22c55e" material="roughness: 0.4; metalness: 0.1"></a-cylinder>
+                    
+                    <!-- ใบไม้ด้านซ้าย (ดัดโค้งมุมข้าง) -->
+                    <a-entity position="-0.12 0.1 0" rotation="0 0 25">
+                        <a-cone radius-bottom="0.12" height="0.7" color="#16a34a" scale="0.12 1 0.6" rotation="0 0 35"></a-cone>
+                    </a-entity>
+                    <!-- ใบไม้ด้านขวา (ดัดโค้งมุมข้าง) -->
+                    <a-entity position="0.12 0.05 0" rotation="0 0 -25">
+                        <a-cone radius-bottom="0.1" height="0.65" color="#15803d" scale="0.12 1 0.6" rotation="0 0 -35"></a-cone>
+                    </a-entity>
+
+                    <!-- ดอกทิวลิปซ้อนกลีบ (Tulip Flower Head) -->
+                    <a-entity id="tulipFlowerHead" position="0 0.9 0">
+                        <!-- ฐานดอก -->
+                        <a-sphere position="0 -0.08 0" radius="0.08" color="#16a34a" scale="1 0.6 1"></a-sphere>
+
+                        <!-- กลีบชั้นนอก (Outer Petals) -->
+                        <a-entity id="petalsGroup">
+                            <a-cone class="tulip-petal" position="0 0.12 0.08" rotation="-15 0 0" radius-bottom="0.18" height="0.45" color="#f472b6" scale="0.4 1 0.8" material="roughness: 0.3; side: double"></a-cone>
+                            <a-cone class="tulip-petal" position="0 0.12 -0.08" rotation="15 0 0" radius-bottom="0.18" height="0.45" color="#f472b6" scale="0.4 1 0.8" material="roughness: 0.3; side: double"></a-cone>
+                            <a-cone class="tulip-petal" position="0.08 0.12 0" rotation="0 0 -15" radius-bottom="0.18" height="0.45" color="#f472b6" scale="0.8 1 0.4" material="roughness: 0.3; side: double"></a-cone>
+                            <a-cone class="tulip-petal" position="-0.08 0.12 0" rotation="0 0 15" radius-bottom="0.18" height="0.45" color="#f472b6" scale="0.8 1 0.4" material="roughness: 0.3; side: double"></a-cone>
+
+                            <!-- กลีบชั้นในซ้อนกลาง -->
+                            <a-cone class="tulip-petal" position="0.04 0.14 0.04" rotation="-8 0 -8" radius-bottom="0.15" height="0.42" color="#f472b6" scale="0.5 1 0.7" material="roughness: 0.3; side: double"></a-cone>
+                            <a-cone class="tulip-petal" position="-0.04 0.14 -0.04" rotation="8 0 8" radius-bottom="0.15" height="0.42" color="#f472b6" scale="0.5 1 0.7" material="roughness: 0.3; side: double"></a-cone>
+                        </a-entity>
+
+                        <!-- เกสรเรืองแสงด้านในดอก -->
+                        <a-entity id="stamens" position="0 0.1 0">
+                            <a-cylinder position="0 0.05 0" radius="0.008" height="0.18" color="#fef08a"></a-cylinder>
+                            <a-sphere position="0 0.14 0" radius="0.02" color="#eab308" material="emissive: #eab308; emissiveIntensity: 0.8"></a-sphere>
+
+                            <a-cylinder position="0.03 0.04 0.02" rotation="0 0 -10" radius="0.006" height="0.15" color="#fef08a"></a-cylinder>
+                            <a-sphere position="0.04 0.12 0.02" radius="0.015" color="#ca8a04" material="emissive: #ca8a04; emissiveIntensity: 0.6"></a-sphere>
+
+                            <a-cylinder position="-0.03 0.04 -0.02" rotation="0 0 10" radius="0.006" height="0.15" color="#fef08a"></a-cylinder>
+                            <a-sphere position="-0.04 0.12 -0.02" radius="0.015" color="#ca8a04" material="emissive: #ca8a04; emissiveIntensity: 0.6"></a-sphere>
+                        </a-entity>
+                    </a-entity>
+                </a-entity>
+
+                <!-- กลุ่มผีเสื้อบินรอบมุมมองด้านข้าง (Butterflies Orbit Group) -->
+                <a-entity id="butterfliesContainer"></a-entity>
+
+                <!-- กลุ่มละอองเกสรเรืองแสงลอยรอบๆ (Floating Pollen Particles) -->
+                <a-entity id="pollenContainer"></a-entity>
+
+            </a-entity>
+
+        </a-marker>
+
+        <!-- กล้องถ่ายภาพ -->
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // ค่าการตั้งค่าระบบ
+            let butterflySpeedMultiplier = 1.0;
+            let currentPetalColor = '#f472b6';
+            let butterflyCount = 4;
+            let isDebugMode = false;
+            let animationTime = 0;
+
+            const butterfliesContainer = document.getElementById('butterfliesContainer');
+            const pollenContainer = document.getElementById('pollenContainer');
+            const mainGardenGroup = document.getElementById('mainGardenGroup');
+            const hiroMarker = document.getElementById('hiroMarker');
+            const markerStatus = document.getElementById('markerStatus');
+            const toggleDebugBtn = document.getElementById('toggleDebugBtn');
+            const currentColorText = document.getElementById('currentColorText');
+            const bfCountDisplay = document.getElementById('bfCountDisplay');
+
+            // รายการสีและรูปแบบผีเสื้อ
+            const butterflyConfigs = [
+                { wingColor: '#38bdf8', bodyColor: '#0f172a', scale: 0.22, orbitRadius: 0.75, speedOffset: 1.0, yOffset: 0.8, phase: 0 },
+                { wingColor: '#f97316', bodyColor: '#1e293b', scale: 0.20, orbitRadius: 0.90, speedOffset: 0.85, yOffset: 1.0, phase: 1.8 },
+                { wingColor: '#c084fc', bodyColor: '#111827', scale: 0.18, orbitRadius: 0.65, speedOffset: 1.2, yOffset: 0.65, phase: 3.5 },
+                { wingColor: '#facc15', bodyColor: '#0284c7', scale: 0.24, orbitRadius: 0.80, speedOffset: 0.95, yOffset: 1.15, phase: 5.0 },
+                { wingColor: '#f43f5e', bodyColor: '#0f172a', scale: 0.19, orbitRadius: 0.70, speedOffset: 1.1, yOffset: 0.75, phase: 2.3 }
+            ];
+
+            // สร้างผีเสื้อ 3D ชิ้นงานแต่ละตัว (Procedural Dual-Wing Butterfly)
+            function createButterflyEntity(config, index) {
+                const bfGroup = document.createElement('a-entity');
+                bfGroup.setAttribute('id', `butterfly-${index}`);
+                bfGroup.className = 'butterfly-item';
+
+                // ตัวผีเสื้อ (Body)
+                const body = document.createElement('a-cylinder');
+                body.setAttribute('radius', '0.03');
+                body.setAttribute('height', '0.3');
+                body.setAttribute('color', config.bodyColor);
+                body.setAttribute('rotation', '90 0 0');
+
+                // หัวผีเสื้อ (Head)
+                const head = document.createElement('a-sphere');
+                head.setAttribute('position', '0 0 0.16');
+                head.setAttribute('radius', '0.04');
+                head.setAttribute('color', '#020617');
+
+                // หนวดผีเสื้อ 2 ข้าง
+                const antL = document.createElement('a-cylinder');
+                antL.setAttribute('position', '0.02 0.04 0.18');
+                antL.setAttribute('rotation', '20 20 0');
+                antL.setAttribute('radius', '0.005');
+                antL.setAttribute('height', '0.15');
+                antL.setAttribute('color', '#020617');
+
+                const antR = document.createElement('a-cylinder');
+                antR.setAttribute('position', '-0.02 0.04 0.18');
+                antR.setAttribute('rotation', '20 -20 0');
+                antR.setAttribute('radius', '0.005');
+                antR.setAttribute('height', '0.15');
+                antR.setAttribute('color', '#020617');
+
+                // ปีกซ้าย (Left Wing)
+                const leftWingPivot = document.createElement('a-entity');
+                leftWingPivot.setAttribute('id', `bf-${index}-wing-left`);
+                leftWingPivot.setAttribute('position', '0.01 0 0');
+
+                const leftWing = document.createElement('a-circle');
+                leftWing.setAttribute('position', '0.18 0 0');
+                leftWing.setAttribute('radius', '0.22');
+                leftWing.setAttribute('color', config.wingColor);
+                leftWing.setAttribute('side', 'double');
+                leftWing.setAttribute('material', 'roughness: 0.2; metalness: 0.1; opacity: 0.92;');
+                leftWing.setAttribute('scale', '1 0.7 1');
+
+                const leftWingPattern = document.createElement('a-circle');
+                leftWingPattern.setAttribute('position', '0.18 0 0.001');
+                leftWingPattern.setAttribute('radius', '0.1');
+                leftWingPattern.setAttribute('color', '#ffffff');
+                leftWingPattern.setAttribute('side', 'double');
+                leftWingPattern.setAttribute('scale', '0.8 0.5 1');
+                leftWingPattern.setAttribute('material', 'opacity: 0.6;');
+
+                leftWingPivot.appendChild(leftWing);
+                leftWingPivot.appendChild(leftWingPattern);
+
+                // ปีกขวา (Right Wing)
+                const rightWingPivot = document.createElement('a-entity');
+                rightWingPivot.setAttribute('id', `bf-${index}-wing-right`);
+                rightWingPivot.setAttribute('position', '-0.01 0 0');
+
+                const rightWing = document.createElement('a-circle');
+                rightWing.setAttribute('position', '-0.18 0 0');
+                rightWing.setAttribute('radius', '0.22');
+                rightWing.setAttribute('color', config.wingColor);
+                rightWing.setAttribute('side', 'double');
+                rightWing.setAttribute('material', 'roughness: 0.2; metalness: 0.1; opacity: 0.92;');
+                rightWing.setAttribute('scale', '1 0.7 1');
+
+                const rightWingPattern = document.createElement('a-circle');
+                rightWingPattern.setAttribute('position', '-0.18 0 0.001');
+                rightWingPattern.setAttribute('radius', '0.1');
+                rightWingPattern.setAttribute('color', '#ffffff');
+                rightWingPattern.setAttribute('side', 'double');
+                rightWingPattern.setAttribute('scale', '0.8 0.5 1');
+                rightWingPattern.setAttribute('material', 'opacity: 0.6;');
+
+                rightWingPivot.appendChild(rightWing);
+                rightWingPivot.appendChild(rightWingPattern);
+
+                // ประกอบชิ้นส่วน
+                bfGroup.appendChild(body);
+                bfGroup.appendChild(head);
+                bfGroup.appendChild(antL);
+                bfGroup.appendChild(antR);
+                bfGroup.appendChild(leftWingPivot);
+                bfGroup.appendChild(rightWingPivot);
+
+                bfGroup.setAttribute('scale', `${config.scale} ${config.scale} ${config.scale}`);
+
+                return bfGroup;
+            }
+
+            // อัปเดตผีเสื้อตามจำนวนที่เลือก
+            function renderButterflies() {
+                butterfliesContainer.innerHTML = '';
+                for (let i = 0; i < butterflyCount; i++) {
+                    const config = butterflyConfigs[i % butterflyConfigs.length];
+                    const bf = createButterflyEntity(config, i);
+                    butterfliesContainer.appendChild(bf);
+                }
+            }
+
+            // สร้างละอองเกสรเรืองแสง (Floating Pollen)
+            function renderPollenParticles() {
+                pollenContainer.innerHTML = '';
+                for (let i = 0; i < 18; i++) {
+                    const pollen = document.createElement('a-sphere');
+                    const px = (Math.random() - 0.5) * 1.6;
+                    const py = 0.3 + Math.random() * 1.0;
+                    const pz = (Math.random() - 0.5) * 1.6;
+                    const size = 0.01 + Math.random() * 0.018;
+
+                    pollen.setAttribute('position', `${px} ${py} ${pz}`);
+                    pollen.setAttribute('radius', size);
+                    pollen.setAttribute('color', '#fef08a');
+                    pollen.setAttribute('material', 'emissive: #fef08a; emissiveIntensity: 0.9; opacity: 0.75; transparent: true;');
+                    pollen.className = 'pollen-particle';
+                    pollen.dataset.baseY = py;
+                    pollen.dataset.speed = 0.5 + Math.random() * 1.2;
+                    pollen.dataset.phase = Math.random() * Math.PI * 2;
+
+                    pollenContainer.appendChild(pollen);
+                }
+            }
+
+            // เปลี่ยนสีกลีบดอกทิวลิป
+            function setTulipColor(hexColor, name) {
+                currentPetalColor = hexColor;
+                document.querySelectorAll('.tulip-petal').forEach(petal => {
+                    petal.setAttribute('color', hexColor);
+                });
+                if (name && currentColorText) {
+                    currentColorText.textContent = name;
+                }
+            }
+
+            // ตรวจจับ Marker
+            hiroMarker.addEventListener('markerFound', () => {
+                markerStatus.textContent = "พบ Marker Hiro แล้ว (แสดงมุมมองด้านข้าง)";
+                markerStatus.className = "text-[11px] text-emerald-400 font-semibold";
+            });
+
+            hiroMarker.addEventListener('markerLost', () => {
+                markerStatus.textContent = "กำลังสแกนหา Marker Hiro...";
+                markerStatus.className = "text-[11px] text-pink-300";
+            });
+
+            // ปุ่มเปลี่ยนสีดอกไม้
+            document.querySelectorAll('.color-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('btn-active'));
+                    btn.classList.add('btn-active');
+                    const color = btn.getAttribute('data-color');
+                    const name = btn.getAttribute('data-name');
+                    setTulipColor(color, name);
+                });
+            });
+
+            // ปุ่มปรับความเร็วผีเสื้อ
+            document.querySelectorAll('.speed-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('btn-active'));
+                    btn.classList.add('btn-active');
+                    butterflySpeedMultiplier = parseFloat(btn.getAttribute('data-speed'));
+                });
+            });
+
+            // ปุ่มเพิ่ม/ลดจำนวนผีเสื้อ
+            document.getElementById('btnDecreaseBF').addEventListener('click', () => {
+                if (butterflyCount > 1) {
+                    butterflyCount--;
+                    bfCountDisplay.textContent = `${butterflyCount} ตัว`;
+                    renderButterflies();
+                }
+            });
+
+            document.getElementById('btnIncreaseBF').addEventListener('click', () => {
+                if (butterflyCount < 5) {
+                    butterflyCount++;
+                    bfCountDisplay.textContent = `${butterflyCount} ตัว`;
+                    renderButterflies();
+                }
+            });
+
+            // ปุ่มสลับโหมดทดสอบ 3D (สำหรับทดสอบโดยไม่ใช้ Marker)
+            toggleDebugBtn.addEventListener('click', () => {
+                isDebugMode = !isDebugMode;
+                if (isDebugMode) {
+                    toggleDebugBtn.classList.add('bg-pink-600', 'text-white');
+                    // ย้ายฉากมาตั้งตรงหน้ากล้องมุมมองด้านข้าง
+                    mainGardenGroup.setAttribute('position', '0 -0.2 -2.2');
+                    mainGardenGroup.setAttribute('rotation', '20 -35 0');
+                    document.querySelector('a-scene').appendChild(mainGardenGroup);
+                    markerStatus.textContent = "เปิดใช้งานโหมดทดสอบ 3D (Side View Preview)";
+                } else {
+                    toggleDebugBtn.classList.remove('bg-pink-600', 'text-white');
+                    mainGardenGroup.setAttribute('position', '0 0 0');
+                    mainGardenGroup.setAttribute('rotation', '90 0 0');
+                    hiroMarker.appendChild(mainGardenGroup);
+                    markerStatus.textContent = "กำลังสแกนหา Marker Hiro...";
+                }
+            });
+
+            // รีเซ็ตองศามุมมองด้านข้าง
+            document.getElementById('resetSideViewBtn').addEventListener('click', () => {
+                if (!isDebugMode) {
+                    mainGardenGroup.setAttribute('rotation', '90 0 0');
+                    mainGardenGroup.setAttribute('position', '0 0 0');
+                } else {
+                    mainGardenGroup.setAttribute('rotation', '20 -35 0');
+                    mainGardenGroup.setAttribute('position', '0 -0.2 -2.2');
+                }
+            });
+
+            // Loop การเคลื่อนไหวแอนิเมชัน (Flapping Wings & Flying Orbit Animation)
+            let lastTime = performance.now();
+
+            function animate(now) {
+                requestAnimationFrame(animate);
+
+                const dt = (now - lastTime) / 1000;
+                lastTime = now;
+                animationTime += dt * butterflySpeedMultiplier;
+
+                // 1. ขยับปีกผีเสื้อและเคลื่อนที่หมุนรอบดอกทิวลิปมุมมองด้านข้าง
+                for (let i = 0; i < butterflyCount; i++) {
+                    const bf = document.getElementById(`butterfly-${i}`);
+                    if (!bf) continue;
+
+                    const config = butterflyConfigs[i % butterflyConfigs.length];
+                    const t = animationTime * config.speedOffset + config.phase;
+
+                    // คำนวณพิกัดการบินวงกลมรอบก้านดอกไม้ในแนว Side-Profile View
+                    const radius = config.orbitRadius + Math.sin(t * 1.5) * 0.12;
+                    const x = Math.cos(t) * radius;
+                    const z = Math.sin(t) * radius;
+                    const y = config.yOffset + Math.sin(t * 2.5) * 0.18;
+
+                    bf.setAttribute('position', `${x} ${y} ${z}`);
+
+                    // หมุนหน้าผีเสื้อตามทิศทางการบิน
+                    const tangentX = -Math.sin(t);
+                    const tangentZ = Math.cos(t);
+                    const angleDeg = Math.atan2(tangentX, tangentZ) * (180 / Math.PI);
+                    bf.setAttribute('rotation', `0 ${angleDeg + 90} ${Math.sin(t * 3) * 15}`);
+
+                    // แอนิเมชันขยับปีกพะพือแบบสมจริง (Wing Flapping)
+                    const flapAngle = Math.sin(now * 0.018 * config.speedOffset * butterflySpeedMultiplier + config.phase) * 55;
+                    const wingLeft = document.getElementById(`bf-${i}-wing-left`);
+                    const wingRight = document.getElementById(`bf-${i}-wing-right`);
+
+                    if (wingLeft) wingLeft.setAttribute('rotation', `0 0 ${flapAngle}`);
+                    if (wingRight) wingRight.setAttribute('rotation', `0 0 ${-flapAngle}`);
+                }
+
+                // 2. ขยับละอองเกสรเรืองแสงลอยขึ้นลงช้าๆ
+                const pollens = document.querySelectorAll('.pollen-particle');
+                pollens.forEach(p => {
+                    const baseY = parseFloat(p.dataset.baseY);
+                    const speed = parseFloat(p.dataset.speed);
+                    const phase = parseFloat(p.dataset.phase);
+                    const newY = baseY + Math.sin(animationTime * speed + phase) * 0.15;
+                    const currentPos = p.getAttribute('position');
+                    p.setAttribute('position', `${currentPos.x} ${newY} ${currentPos.z}`);
+                });
+            }
+
+            // เริ่มต้นระบบ
+            renderButterflies();
+            renderPollenParticles();
+            requestAnimationFrame(animate);
+        });
+    </script>
+</body>
+</html>
